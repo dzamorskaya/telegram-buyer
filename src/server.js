@@ -625,20 +625,8 @@ async function fetchMacysProducts({ skippedProductUrls = [], pageStart = 1 } = {
     throw new Error("Macy's import failed: empty product list");
   }
 
-  const sizedProducts = await Promise.all(
-    products.map(async (product) => {
-      const sizes = await fetchMacysSizes(product.productUrl);
-
-      return {
-        ...product,
-        sizes,
-        sizeNote: sizes.length > 0 ? sizes.join(", ") : "Размеры пока не найдены в Macy's"
-      };
-    })
-  );
-
   return {
-    products: sizedProducts,
+    products,
     nextPageStart
   };
 }
@@ -732,7 +720,6 @@ async function mapNikeProduct(product) {
     ? Math.round(((initialPrice - currentPrice) / initialPrice) * 100)
     : 0;
   const badge = product.badgeLabel?.trim();
-  const sizes = await fetchNikeSizes(product.pdpUrl.url);
 
   return {
     id: `nike-${slugify(product.productCode || title)}`,
@@ -752,8 +739,8 @@ async function mapNikeProduct(product) {
     currency: product.prices?.currency || "USD",
     status: discount >= 20 ? "ready" : "review",
     category: String(product.productType || "general").toLowerCase(),
-    sizes,
-    sizeNote: sizes.length > 0 ? sizes.join(", ") : "Размеры смотреть в карточке Nike",
+    sizes: [],
+    sizeNote: "Размеры подтянем отдельно при необходимости",
     availability: "in_stock",
     lastCheckedAt: new Date().toISOString(),
     marginNote: badge ? `Маркер Nike: ${badge}` : `Категория: ${subtitle}`,
@@ -766,65 +753,6 @@ async function mapNikeProduct(product) {
       badge ? `Маркер: ${badge}` : "Проверить размеры и доставку перед публикацией."
     ].join("\n")
   };
-}
-
-async function fetchNikeSizes(productUrl) {
-  try {
-    const response = await fetch(productUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 TelegramBuyer/1.0",
-        Accept: "text/html,application/xhtml+xml"
-      },
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const html = await response.text();
-    const nextDataMatch = html.match(
-      /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
-    );
-
-    if (!nextDataMatch) {
-      return [];
-    }
-
-    const sizeMatches = [...nextDataMatch[1].matchAll(/"localizedLabel":"([^"]+)"/g)]
-      .map((match) => match[1])
-      .filter((label) => /^W\s/.test(label));
-
-    return [...new Set(sizeMatches)].slice(0, 8);
-  } catch {
-    return [];
-  }
-}
-
-async function fetchMacysSizes(productUrl) {
-  try {
-    const response = await fetch(productUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 TelegramBuyer/1.0",
-        Accept: "text/html,application/xhtml+xml"
-      },
-      signal: AbortSignal.timeout(30000)
-    });
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const html = await response.text();
-    const sizeMatches = [...html.matchAll(/"size":"([^"]+)"/g)]
-      .map((match) => normalizeMacysSizeLabel(decodeHtmlEntities(match[1]).trim()))
-      .filter(Boolean)
-      .filter((label) => !/^(default)$/i.test(label));
-
-    return [...new Set(sizeMatches)].slice(0, 12);
-  } catch {
-    return [];
-  }
 }
 
 function loadEnvFile() {
@@ -863,18 +791,6 @@ function decodeHtmlEntities(value) {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
-}
-
-function normalizeMacysSizeLabel(label) {
-  if (!label) {
-    return "";
-  }
-
-  if (/^(no size|one size|one size fits all)$/i.test(label)) {
-    return "One size";
-  }
-
-  return label;
 }
 
 async function readJsonBody(request) {
