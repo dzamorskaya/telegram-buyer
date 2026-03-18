@@ -260,6 +260,10 @@ async function loadState() {
 }
 
 function matchesFilters(product) {
+  if (product.status === "skipped") {
+    return false;
+  }
+
   if (filters.sourceId !== "all" && product.sourceId !== filters.sourceId) {
     return false;
   }
