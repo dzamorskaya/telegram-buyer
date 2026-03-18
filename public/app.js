@@ -22,6 +22,7 @@ const elements = {
   sizesOnlyFilter: document.querySelector("#sizesOnlyFilter"),
   scanButton: document.querySelector("#scanButton"),
   importMacysButton: document.querySelector("#importMacysButton"),
+  loadMoreButton: document.querySelector("#loadMoreButton"),
   autopostButton: document.querySelector("#autopostButton"),
   testPostButton: document.querySelector("#testPostButton")
 };
@@ -43,6 +44,15 @@ elements.importMacysButton.addEventListener("click", async () => {
     "/api/import-macys",
     "Импорт из Macy's",
     "Товары из Macy's обновлены в админке."
+  );
+});
+
+elements.loadMoreButton.addEventListener("click", async () => {
+  await runImportAction(
+    elements.loadMoreButton,
+    "/api/load-more",
+    "Загрузить ещё",
+    "Следующая порция товаров загружена."
   );
 });
 
@@ -150,6 +160,7 @@ async function loadState() {
   elements.sourceList.innerHTML = "";
   elements.productList.innerHTML = "";
   elements.queueList.innerHTML = "";
+  elements.loadMoreButton.disabled = !state.importState?.lastSourceId;
 
   for (const source of state.sources) {
     const item = document.createElement("a");

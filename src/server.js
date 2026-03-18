@@ -16,7 +16,7 @@ const adminUsername = process.env.ADMIN_USERNAME?.trim() || "buyer";
 const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "buyer-access-2026";
 const nikeCatalogUrl = "https://www.nike.com/w/womens-shoes-5e1x6zy7ok";
 const macysCatalogUrl = "https://www.macys.com/shop/womens?id=118";
-const importBatchSize = 100;
+const importBatchSize = 48;
 const macysCatalogPages = 4;
 
 const mimeTypes = {
@@ -47,7 +47,16 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/api/import-nike") {
       const nextState = withRuntimeState(readState());
       nextState.lastScanAt = new Date().toISOString();
-      nextState.products = await fetchNikeProducts(nextState.skippedProductUrls);
+      const importResult = await fetchNikeProducts({
+        skippedProductUrls: nextState.skippedProductUrls,
+        offset: 0
+      });
+      nextState.products = importResult.products;
+      nextState.importState = {
+        ...nextState.importState,
+        lastSourceId: "nike",
+        nikeOffset: importResult.nextOffset
+      };
       nextState.queue = normalizeQueue(nextState.queue, nextState.products);
       writeState(nextState);
       return json(response, 200, nextState);
@@ -56,7 +65,61 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && url.pathname === "/api/import-macys") {
       const nextState = withRuntimeState(readState());
       nextState.lastScanAt = new Date().toISOString();
-      nextState.products = await fetchMacysProducts(nextState.skippedProductUrls);
+      const importResult = await fetchMacysProducts({
+        skippedProductUrls: nextState.skippedProductUrls,
+        pageStart: 1
+      });
+      nextState.products = importResult.products;
+      nextState.importState = {
+        ...nextState.importState,
+        lastSourceId: "macys",
+        macysPageStart: importResult.nextPageStart
+      };
+      nextState.queue = normalizeQueue(nextState.queue, nextState.products);
+      writeState(nextState);
+      return json(response, 200, nextState);
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/load-more") {
+      const nextState = withRuntimeState(readState());
+      const sourceId = nextState.importState?.lastSourceId;
+
+      if (!sourceId) {
+        return json(response, 400, { error: "Сначала запусти импорт магазина." });
+      }
+
+      let importResult;
+
+      if (sourceId === "nike") {
+        importResult = await fetchNikeProducts({
+          skippedProductUrls: [
+            ...nextState.skippedProductUrls,
+            ...nextState.products.map((product) => product.productUrl)
+          ],
+          offset: nextState.importState?.nikeOffset || 0
+        });
+        nextState.importState = {
+          ...nextState.importState,
+          nikeOffset: importResult.nextOffset
+        };
+      } else if (sourceId === "macys") {
+        importResult = await fetchMacysProducts({
+          skippedProductUrls: [
+            ...nextState.skippedProductUrls,
+            ...nextState.products.map((product) => product.productUrl)
+          ],
+          pageStart: nextState.importState?.macysPageStart || 1
+        });
+        nextState.importState = {
+          ...nextState.importState,
+          macysPageStart: importResult.nextPageStart
+        };
+      } else {
+        return json(response, 400, { error: "Для этого источника загрузка ещё не подключена." });
+      }
+
+      nextState.lastScanAt = new Date().toISOString();
+      nextState.products = dedupeProductsByUrl([...nextState.products, ...importResult.products]);
       nextState.queue = normalizeQueue(nextState.queue, nextState.products);
       writeState(nextState);
       return json(response, 200, nextState);
@@ -222,6 +285,11 @@ function ensureDataFile() {
       },
       pricing: createDefaultPricing(),
       sources: createDefaultSources(),
+      importState: {
+        lastSourceId: null,
+        nikeOffset: 0,
+        macysPageStart: 1
+      },
       skippedProductUrls: [],
       queue: [],
       lastScanAt: null,
@@ -369,6 +437,7 @@ function withRuntimeState(state) {
     },
     sources: mergedSources,
     pricing,
+    importState: normalizeImportState(state.importState),
     skippedProductUrls: normalizeSkippedProductUrls(state.skippedProductUrls),
     queue: normalizeQueue(Array.isArray(state.queue) ? state.queue : [], enrichedProducts),
     products: enrichedProducts
@@ -433,6 +502,26 @@ function normalizeSkippedProductUrls(urls) {
   }
 
   return [...new Set(urls.filter((url) => typeof url === "string" && url.trim()))];
+}
+
+function normalizeImportState(importState) {
+  return {
+    lastSourceId: importState?.lastSourceId || null,
+    nikeOffset: sanitizeNumber(importState?.nikeOffset, 0),
+    macysPageStart: sanitizeNumber(importState?.macysPageStart, 1)
+  };
+}
+
+function dedupeProductsByUrl(products) {
+  const seen = new Set();
+  return products.filter((product) => {
+    if (!product?.productUrl || seen.has(product.productUrl)) {
+      return false;
+    }
+
+    seen.add(product.productUrl);
+    return true;
+  });
 }
 
 function withComputedPricing(product, pricing) {
@@ -531,7 +620,7 @@ function buildChannelPost(product) {
   ].join("\n");
 }
 
-async function fetchNikeProducts(skippedProductUrls = []) {
+async function fetchNikeProducts({ skippedProductUrls = [], offset = 0 } = {}) {
   const response = await fetch(nikeCatalogUrl, {
     headers: {
       "User-Agent": "Mozilla/5.0 TelegramBuyer/1.0",
@@ -563,28 +652,36 @@ async function fetchNikeProducts(skippedProductUrls = []) {
     throw new Error("Nike import failed: products not found");
   }
 
-  const products = await Promise.all(
-    groupings
+  const allProducts = groupings
     .flatMap((grouping) => grouping.products || [])
     .filter((product) => product?.copy?.title && product?.pdpUrl?.url)
-    .filter((product) => !skippedSet.has(product.pdpUrl.url))
-    .slice(0, importBatchSize)
-    .map((product) => mapNikeProduct(product))
-  );
+    .filter((product) => !skippedSet.has(product.pdpUrl.url));
+
+  const slice = allProducts.slice(offset, offset + importBatchSize);
+  const products = await Promise.all(slice.map((product) => mapNikeProduct(product)));
 
   if (products.length === 0) {
     throw new Error("Nike import failed: empty product list");
   }
 
-  return products;
+  return {
+    products,
+    nextOffset: offset + slice.length
+  };
 }
 
-async function fetchMacysProducts(skippedProductUrls = []) {
+async function fetchMacysProducts({ skippedProductUrls = [], pageStart = 1 } = {}) {
   const skippedSet = new Set(normalizeSkippedProductUrls(skippedProductUrls));
   const products = [];
+  let nextPageStart = pageStart;
 
-  for (let pageIndex = 1; pageIndex <= macysCatalogPages && products.length < importBatchSize; pageIndex += 1) {
+  for (
+    let pageIndex = pageStart;
+    pageIndex < pageStart + macysCatalogPages && products.length < importBatchSize;
+    pageIndex += 1
+  ) {
     const pageProducts = await fetchMacysCatalogPage(pageIndex, skippedSet);
+    nextPageStart = pageIndex + 1;
 
     for (const product of pageProducts) {
       if (products.length >= importBatchSize) {
@@ -615,7 +712,10 @@ async function fetchMacysProducts(skippedProductUrls = []) {
     })
   );
 
-  return sizedProducts;
+  return {
+    products: sizedProducts,
+    nextPageStart
+  };
 }
 
 async function fetchMacysCatalogPage(pageIndex, skippedSet) {
