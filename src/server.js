@@ -17,6 +17,7 @@ const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "buyer-access-2026";
 const nikeCatalogUrl = "https://www.nike.com/w/womens-shoes-5e1x6zy7ok";
 const macysCatalogUrl = "https://www.macys.com/shop/womens?id=118";
 const importBatchSize = 36;
+const macysCatalogPages = 4;
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -579,81 +580,23 @@ async function fetchNikeProducts(skippedProductUrls = []) {
 }
 
 async function fetchMacysProducts(skippedProductUrls = []) {
-  const response = await fetch(macysCatalogUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 TelegramBuyer/1.0",
-      Accept: "text/html,application/xhtml+xml"
-    },
-    signal: AbortSignal.timeout(30000)
-  });
-
-  const html = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`Macy's import failed: status ${response.status}`);
-  }
-
-  const nuxtMatch = html.match(
-    /<script type="application\/json" data-nuxt-data="nuxt-app"[^>]*>([\s\S]*?)<\/script>/
-  );
-
-  if (!nuxtMatch) {
-    throw new Error("Macy's import failed: nuxt data not found");
-  }
-
-  const text = nuxtMatch[1];
-  const productPattern =
-    /\{"product":\d+\},\{"id":\d+,"identifier":\d+,"detail":\d+,"relationships":\d+,"imagery":\d+,"availability":\d+,"traits":\d+,"pricing":\d+(?:,"meta":\d+)?\},\{"productUrl":\d+,"productId":\d+\},"([^"]+)",\{"name":\d+,[^}]*\},"([^"]+)"([\s\S]*?)(?=\{"product":\d+\},\{"id":\d+,"identifier":\d+)/g;
-
   const skippedSet = new Set(normalizeSkippedProductUrls(skippedProductUrls));
   const products = [];
-  let match;
 
-  while ((match = productPattern.exec(text)) && products.length < importBatchSize) {
-    const productUrl = match[1];
-    const title = match[2];
-    const segment = match[3];
-    const fullProductUrl = `https://www.macys.com${productUrl}`;
-    const imagePath = segment.match(/"(\d\/optimized\/[^"]+?\.(?:tif|jpg|jpeg|png))"/)?.[1];
-    const prices = [...segment.matchAll(/"\$([0-9,.]+)"/g)].map((item) =>
-      Number(item[1].replace(/,/g, ""))
-    );
+  for (let pageIndex = 1; pageIndex <= macysCatalogPages && products.length < importBatchSize; pageIndex += 1) {
+    const pageProducts = await fetchMacysCatalogPage(pageIndex, skippedSet);
 
-    if (!productUrl || !title || prices.length === 0 || skippedSet.has(fullProductUrl)) {
-      continue;
+    for (const product of pageProducts) {
+      if (products.length >= importBatchSize) {
+        break;
+      }
+
+      if (products.some((item) => item.productUrl === product.productUrl)) {
+        continue;
+      }
+
+      products.push(product);
     }
-
-    const currentPrice = Math.min(...prices);
-    const oldPrice = Math.max(...prices);
-
-    products.push({
-      id: `macys-${slugify(productUrl)}`,
-      title,
-      sourceId: "macys",
-      sourceName: "Macy's",
-      productUrl: fullProductUrl,
-      imageUrl: imagePath
-        ? enhanceImageUrl(`https://slimages.macysassets.com/is/image/MCY/products/${imagePath}`)
-        : "",
-      weightKg: estimateWeightKg("fashion"),
-      weightSource: "estimate",
-      price: currentPrice,
-      oldPrice,
-      currency: "USD",
-      status: oldPrice > currentPrice ? "ready" : "review",
-      category: inferMacysCategory(productUrl, title),
-      sizes: [],
-      sizeNote: "Размеры загружаются из карточки Macy's",
-      availability: "in_stock",
-      lastCheckedAt: new Date().toISOString(),
-      marginNote: "Импортировано из Macy's",
-      publishedAt: null,
-      draftPost: [
-        title,
-        `Цена: USD ${currentPrice}` + (oldPrice > currentPrice ? ` вместо USD ${oldPrice}` : ""),
-        "Проверить наличие в Macy's перед публикацией."
-      ].join("\n")
-    });
   }
 
   if (products.length === 0) {
@@ -673,6 +616,86 @@ async function fetchMacysProducts(skippedProductUrls = []) {
   );
 
   return sizedProducts;
+}
+
+async function fetchMacysCatalogPage(pageIndex, skippedSet) {
+  const pageUrl = `${macysCatalogUrl}&Pageindex=${pageIndex}`;
+  const response = await fetch(pageUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 TelegramBuyer/1.0",
+      Accept: "text/html,application/xhtml+xml"
+    },
+    signal: AbortSignal.timeout(30000)
+  });
+
+  const html = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`Macy's import failed: status ${response.status}`);
+  }
+
+  const nuxtMatch = html.match(
+    /<script type="application\/json" data-nuxt-data="nuxt-app"[^>]*>([\s\S]*?)<\/script>/
+  );
+
+  if (!nuxtMatch) {
+    return [];
+  }
+
+  const text = nuxtMatch[1];
+  const productPattern =
+    /\{"product":\d+\},\{"id":\d+,"identifier":\d+,"detail":\d+,"relationships":\d+,"imagery":\d+,"availability":\d+,"traits":\d+,"pricing":\d+(?:,"meta":\d+)?\},\{"productUrl":\d+,"productId":\d+\},"([^"]+)",\{"name":\d+,[^}]*\},"([^"]+)"([\s\S]*?)(?=\{"product":\d+\},\{"id":\d+,"identifier":\d+)/g;
+  const pageProducts = [];
+  let match;
+
+  while ((match = productPattern.exec(text))) {
+    const productUrl = match[1];
+    const title = match[2];
+    const segment = match[3];
+    const fullProductUrl = `https://www.macys.com${productUrl}`;
+    const imagePath = segment.match(/"(\d\/optimized\/[^"]+?\.(?:tif|jpg|jpeg|png))"/)?.[1];
+    const prices = [...segment.matchAll(/"\$([0-9,.]+)"/g)].map((item) =>
+      Number(item[1].replace(/,/g, ""))
+    );
+
+    if (!productUrl || !title || prices.length === 0 || skippedSet.has(fullProductUrl)) {
+      continue;
+    }
+
+    const currentPrice = Math.min(...prices);
+    const oldPrice = Math.max(...prices);
+
+    pageProducts.push({
+      id: `macys-${slugify(productUrl)}`,
+      title,
+      sourceId: "macys",
+      sourceName: "Macy's",
+      productUrl: fullProductUrl,
+      imageUrl: imagePath
+        ? enhanceImageUrl(`https://slimages.macysassets.com/is/image/MCY/products/${imagePath}`)
+        : "",
+      weightKg: estimateWeightKg("fashion"),
+      weightSource: "estimate",
+      price: currentPrice,
+      oldPrice,
+      currency: "USD",
+      status: oldPrice > currentPrice ? "ready" : "review",
+      category: inferMacysCategory(productUrl, title),
+      sizes: [],
+      sizeNote: "Размеры загружаются из карточки Macy's",
+      availability: "in_stock",
+      lastCheckedAt: new Date().toISOString(),
+      marginNote: `Импортировано из Macy's · страница ${pageIndex}`,
+      publishedAt: null,
+      draftPost: [
+        title,
+        `Цена: USD ${currentPrice}` + (oldPrice > currentPrice ? ` вместо USD ${oldPrice}` : ""),
+        "Проверить наличие в Macy's перед публикацией."
+      ].join("\n")
+    });
+  }
+
+  return pageProducts;
 }
 
 async function mapNikeProduct(product) {
