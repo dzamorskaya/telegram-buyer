@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telegram Buyer</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">TB</div>
+          <div>
+            <p class="eyebrow">Buyer OS</p>
+            <h1>Telegram Buyer</h1>
+          </div>
+        </div>
+        <nav class="nav">
+          <a href="#overview" class="nav-link active">Панель</a>
+          <a href="#products" class="nav-link">Лента товаров</a>
+          <a href="#channel" class="nav-link">Канал</a>
+          <a href="#autopost" class="nav-link">Автоматизация</a>
+        </nav>
+        <div class="sidebar-note">
+          <p class="eyebrow">Статус</p>
+          <strong>Рабочий прототип</strong>
+          <p>Дальше сюда подключим реальные магазины, генерацию текста и публикацию в канал.</p>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar" id="overview">
+          <div>
+            <p class="eyebrow">Операционная панель</p>
+            <h2>Управление товарным каналом</h2>
+            <p class="lead">
+              Отбор товаров, контроль цен, черновики постов и автопостинг в одном рабочем интерфейсе.
+            </p>
+          </div>
+          <div class="actions">
+            <button id="scanButton" class="primary">Импорт из Nike</button>
+            <button id="importMacysButton" class="secondary">Импорт из Macy's</button>
+            <button id="testPostButton" class="secondary">Тестовый пост</button>
+            <button id="autopostButton" class="secondary">Автопостинг</button>
+          </div>
+        </header>
+
+        <section class="metrics">
+          <article class="metric-card">
+            <span class="metric-label">Последний скан</span>
+            <strong id="lastScan">-</strong>
+            <p>Когда система последний раз импортировала товары из источника.</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Активные позиции</span>
+            <strong id="productCount">0</strong>
+            <p>Товары, которые можно разбирать, редактировать и ставить в очередь.</p>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Состояние автопоста</span>
+            <strong id="autopostStatus">OFF</strong>
+            <p>Текущий режим публикации в Telegram-канал.</p>
+          </article>
+        </section>
+
+        <section class="workspace">
+          <section class="main-column">
+            <article class="panel" id="products">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Поток товаров</p>
+                  <h3>Кандидаты на публикацию</h3>
+                </div>
+                <div class="section-meta">Сначала смотрим выгоду, потом текст поста</div>
+              </div>
+              <div class="filter-bar">
+                <label class="filter-field">
+                  <span>Магазин</span>
+                  <select id="sourceFilter">
+                    <option value="all">Все</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span>Статус</span>
+                  <select id="statusFilter">
+                    <option value="ready">Только ready</option>
+                    <option value="all">Любой</option>
+                    <option value="review">Только review</option>
+                    <option value="queued">Только queued</option>
+                    <option value="published">Только published</option>
+                  </select>
+                </label>
+                <label class="filter-field">
+                  <span>Скидка от</span>
+                  <input id="minDiscountFilter" type="number" min="0" step="1" value="20" />
+                </label>
+                <label class="filter-toggle">
+                  <input id="sizesOnlyFilter" type="checkbox" checked />
+                  <span>Только с размерами</span>
+                </label>
+              </div>
+              <div id="productList" class="product-list"></div>
+            </article>
+
+            <article class="panel" id="queue">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">Очередь</p>
+                  <h3>Товары на публикацию</h3>
+                </div>
+                <div class="section-meta">Ручной отбор перед отправкой в канал</div>
+              </div>
+              <div id="queueList" class="queue-list"></div>
+            </article>
+          </section>
+
+          <aside class="side-column">
+            <article class="panel compact" id="channel">
+              <p class="eyebrow">Канал</p>
+              <h3 id="channelName">-</h3>
+              <p class="muted">ID: <span id="channelId">-</span></p>
+              <p class="muted">Бот: <span id="botStatus">-</span></p>
+              <p id="channelTone" class="note"></p>
+            </article>
+
+            <article class="panel compact" id="autopost">
+              <p class="eyebrow">Автоматизация</p>
+              <h3 id="autopostMode">-</h3>
+              <p class="muted">Интервал: <span id="autopostInterval">-</span> мин</p>
+              <p class="note">
+                Следующий шаг: подключить правила отбора товаров, генерацию текста и публикацию без ручной рутины.
+              </p>
+            </article>
+
+            <article class="panel compact" id="pricing">
+              <p class="eyebrow">Ценообразование</p>
+              <h3>Расчёт цены для клиента</h3>
+              <div class="pricing-form">
+                <label>
+                  <span>Курс USD/RUB</span>
+                  <input id="usdToRubRate" type="number" step="0.1" />
+                </label>
+                <label>
+                  <span>Твой процент</span>
+                  <input id="markupPercent" type="number" step="1" />
+                </label>
+              </div>
+              <p class="pricing-note">
+                Обычный тариф доставки: до 5 кг — 20 $/кг, свыше 5 кг — 18 $/кг. Тариф
+                «Любимый байер» не используется.
+              </p>
+              <button id="savePricingButton" class="secondary wide-button">Сохранить расчёт</button>
+            </article>
+
+            <article class="panel compact" id="sources">
+              <p class="eyebrow">Источники</p>
+              <h3>Магазины для поиска</h3>
+              <p class="muted">Стартовый список из твоей памятки клиента.</p>
+              <div id="sourceList" class="source-list"></div>
+            </article>
+
+            <article class="panel compact">
+              <p class="eyebrow">Сценарий работы</p>
+              <ul class="workflow">
+                <li>Сканируем товары и цены</li>
+                <li>Отбираем лучшие позиции</li>
+                <li>Собираем черновик поста</li>
+                <li>Публикуем в канал автоматически</li>
+              </ul>
+            </article>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+  </html>
