@@ -293,7 +293,7 @@ function ensureDataFile() {
       skippedProductUrls: [],
       queue: [],
       lastScanAt: null,
-      products: createSeedProducts()
+      products: []
     });
   }
 }
@@ -326,81 +326,6 @@ function createDefaultPricing() {
     deliveryRub: 0,
     markupPercent: 30
   };
-}
-
-function createSeedProducts() {
-  return [
-    {
-      id: "nike-air-max-270",
-      title: "Кроссовки Nike Air Max 270",
-      sourceId: "nike",
-      sourceName: "Nike",
-      productUrl: "https://www.nike.com",
-      imageUrl:
-        "https://static.nike.com/a/images/t_PDP_1728_v1/f_auto,q_auto:eco/8ec448b1-cb68-4438-a9be-6cf6938ad082/AIR+MAX+270.png",
-      weightKg: 1.2,
-      weightSource: "estimate",
-      price: 129,
-      oldPrice: 180,
-      currency: process.env.DEFAULT_CURRENCY || "USD",
-      status: "ready",
-      category: "sneakers",
-      sizes: [],
-      sizeNote: "Размерная сетка ходовая",
-      availability: "in_stock",
-      lastCheckedAt: new Date().toISOString(),
-      marginNote: "Хорошая скидка, размерная сетка ходовая",
-      publishedAt: null,
-      draftPost:
-        "Nike Air Max 270\nЦена: $129 вместо $180\nЛовим хорошую скидку на базовую модель. Подойдет на каждый день."
-    },
-    {
-      id: "coach-tabby",
-      title: "Сумка Coach Tabby",
-      sourceId: "nordstrom-rack",
-      sourceName: "Nordstrom Rack",
-      productUrl: "https://www.nordstromrack.com",
-      imageUrl: "",
-      weightKg: 1.0,
-      weightSource: "estimate",
-      price: 210,
-      oldPrice: 320,
-      currency: process.env.DEFAULT_CURRENCY || "USD",
-      status: "review",
-      category: "bags",
-      sizes: [],
-      sizeNote: "One size",
-      availability: "check_shipping",
-      lastCheckedAt: new Date().toISOString(),
-      marginNote: "Нужно проверить доставку и остатки",
-      publishedAt: null,
-      draftPost:
-        "Coach Tabby\nЦена: $210 вместо $320\nАккуратная скидка на популярную модель. Проверяю остатки и условия доставки."
-    },
-    {
-      id: "levis-501-original",
-      title: "Levi's 501 Original",
-      sourceId: "macys",
-      sourceName: "Macy's",
-      productUrl: "https://www.macys.com",
-      imageUrl: "",
-      weightKg: 0.8,
-      weightSource: "estimate",
-      price: 48,
-      oldPrice: 79,
-      currency: process.env.DEFAULT_CURRENCY || "USD",
-      status: "queued",
-      category: "denim",
-      sizes: [],
-      sizeNote: "Лучше собирать популярные размеры",
-      availability: "in_stock",
-      lastCheckedAt: new Date().toISOString(),
-      marginNote: "Можно ставить в ночной автопост",
-      publishedAt: null,
-      draftPost:
-        "Levi's 501 Original\nЦена: $48 вместо $79\nСильная цена на базовые джинсы. Хороший кандидат для автопоста."
-    }
-  ];
 }
 
 function readState() {
@@ -446,7 +371,7 @@ function withRuntimeState(state) {
 
 function migrateProducts(products, sources) {
   if (products.length === 0) {
-    return createSeedProducts();
+    return [];
   }
 
   return products.map((product, index) => {
