@@ -20,6 +20,7 @@ const elements = {
   statusFilter: document.querySelector("#statusFilter"),
   minDiscountFilter: document.querySelector("#minDiscountFilter"),
   sizesOnlyFilter: document.querySelector("#sizesOnlyFilter"),
+  hideOuterwearFilter: document.querySelector("#hideOuterwearFilter"),
   scanButton: document.querySelector("#scanButton"),
   importMacysButton: document.querySelector("#importMacysButton"),
   loadMoreButton: document.querySelector("#loadMoreButton"),
@@ -31,7 +32,8 @@ const filters = {
   sourceId: "all",
   status: "all",
   minDiscount: 0,
-  sizesOnly: false
+  sizesOnly: false,
+  hideOuterwear: true
 };
 
 elements.scanButton.addEventListener("click", async () => {
@@ -139,6 +141,11 @@ elements.sizesOnlyFilter.addEventListener("change", () => {
   loadState();
 });
 
+elements.hideOuterwearFilter.addEventListener("change", () => {
+  filters.hideOuterwear = elements.hideOuterwearFilter.checked;
+  loadState();
+});
+
 await loadState();
 
 async function loadState() {
@@ -189,6 +196,7 @@ async function loadState() {
   elements.statusFilter.value = filters.status;
   elements.minDiscountFilter.value = String(filters.minDiscount);
   elements.sizesOnlyFilter.checked = filters.sizesOnly;
+  elements.hideOuterwearFilter.checked = filters.hideOuterwear;
 
   const filteredProducts = state.products
     .filter((product) => matchesFilters(product))
@@ -291,7 +299,38 @@ function matchesFilters(product) {
     return false;
   }
 
+  if (filters.hideOuterwear && isOuterwearProduct(product)) {
+    return false;
+  }
+
   return true;
+}
+
+function isOuterwearProduct(product) {
+  const haystack = [product.title, product.category, product.marginNote, product.draftPost]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const outerwearKeywords = [
+    "jacket",
+    "coat",
+    "parka",
+    "puffer",
+    "anorak",
+    "raincoat",
+    "trench",
+    "blazer",
+    "windbreaker",
+    "shacket",
+    "quilted coat",
+    "outerwear",
+    "курт",
+    "пальто",
+    "ветров"
+  ];
+
+  return outerwearKeywords.some((keyword) => haystack.includes(keyword));
 }
 
 function formatDate(value) {

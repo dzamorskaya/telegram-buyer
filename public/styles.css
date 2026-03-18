@@ -279,6 +279,11 @@ button.secondary {
   background: var(--surface-2);
 }
 
+.filter-toggle-accent {
+  background: #edf4fb;
+  border-color: #cddcf0;
+}
+
 .filter-toggle input {
   margin-right: 8px;
 }
@@ -756,6 +761,12 @@ button.secondary {
   .draft {
     font-size: 14px;
     line-height: 1.45;
+  }
+
+  .filter-toggle,
+  .filter-toggle-accent {
+    min-height: 52px;
+    align-items: center;
   }
 
   .product-actions {
