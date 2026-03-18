@@ -16,7 +16,7 @@ const adminUsername = process.env.ADMIN_USERNAME?.trim() || "buyer";
 const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "buyer-access-2026";
 const nikeCatalogUrl = "https://www.nike.com/w/womens-shoes-5e1x6zy7ok";
 const macysCatalogUrl = "https://www.macys.com/shop/womens?id=118";
-const importBatchSize = 36;
+const importBatchSize = 100;
 const macysCatalogPages = 4;
 
 const mimeTypes = {
