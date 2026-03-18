@@ -14,6 +14,8 @@ const elements = {
   markupPercent: document.querySelector("#markupPercent"),
   savePricingButton: document.querySelector("#savePricingButton"),
   sourceList: document.querySelector("#sourceList"),
+  uiMessage: document.querySelector("#uiMessage"),
+  filterSummary: document.querySelector("#filterSummary"),
   sourceFilter: document.querySelector("#sourceFilter"),
   statusFilter: document.querySelector("#statusFilter"),
   minDiscountFilter: document.querySelector("#minDiscountFilter"),
@@ -26,9 +28,9 @@ const elements = {
 
 const filters = {
   sourceId: "all",
-  status: "ready",
-  minDiscount: 20,
-  sizesOnly: true
+  status: "all",
+  minDiscount: 0,
+  sizesOnly: false
 };
 
 elements.scanButton.addEventListener("click", async () => {
@@ -50,6 +52,7 @@ elements.autopostButton.addEventListener("click", async () => {
   try {
     await fetch("/api/toggle-autopost", { method: "POST" });
     await loadState();
+    showMessage("Режим автопостинга обновлён.");
   } finally {
     elements.autopostButton.disabled = false;
   }
@@ -67,10 +70,10 @@ elements.testPostButton.addEventListener("click", async () => {
       throw new Error(result.error || "Не удалось отправить тестовый пост");
     }
 
-    window.alert("Тестовый пост отправлен в канал.");
+    showMessage("Тестовый пост отправлен в канал.");
     await loadState();
   } catch (error) {
-    window.alert(error.message || "Ошибка отправки");
+    showMessage(error.message || "Ошибка отправки", "error");
   } finally {
     elements.testPostButton.disabled = false;
     elements.testPostButton.textContent = "Тестовый пост";
@@ -98,8 +101,9 @@ elements.savePricingButton.addEventListener("click", async () => {
     }
 
     await loadState();
+    showMessage("Расчёт цены сохранён.");
   } catch (error) {
-    window.alert(error.message || "Ошибка сохранения");
+    showMessage(error.message || "Ошибка сохранения", "error");
   } finally {
     elements.savePricingButton.disabled = false;
   }
@@ -178,6 +182,8 @@ async function loadState() {
   const filteredProducts = state.products
     .filter((product) => matchesFilters(product))
     .sort((left, right) => discountPercent(right.price, right.oldPrice) - discountPercent(left.price, left.oldPrice));
+
+  elements.filterSummary.textContent = `Показано ${filteredProducts.length} из ${state.products.length} товаров`;
 
   if (filteredProducts.length === 0) {
     elements.productList.innerHTML = '<p class="queue-empty">По текущим фильтрам подходящих товаров нет.</p>';
@@ -350,8 +356,9 @@ async function runProductAction(button, action) {
     }
 
     await loadState();
+    showMessage(actionLabel(action));
   } catch (error) {
-    window.alert(error.message || "Ошибка действия");
+    showMessage(error.message || "Ошибка действия", "error");
   } finally {
     button.disabled = false;
   }
@@ -360,6 +367,7 @@ async function runProductAction(button, action) {
 async function runImportAction(button, url, idleLabel, successMessage) {
   button.disabled = true;
   button.textContent = "Импорт...";
+  showMessage(`Запускаю ${idleLabel.toLowerCase()}...`);
 
   try {
     const response = await fetch(url, { method: "POST" });
@@ -370,11 +378,29 @@ async function runImportAction(button, url, idleLabel, successMessage) {
     }
 
     await loadState();
-    window.alert(successMessage);
+    showMessage(successMessage);
   } catch (error) {
-    window.alert(error.message || "Ошибка импорта");
+    showMessage(error.message || "Ошибка импорта", "error");
   } finally {
     button.disabled = false;
     button.textContent = idleLabel;
+  }
+}
+
+function showMessage(text, tone = "info") {
+  elements.uiMessage.textContent = text;
+  elements.uiMessage.className = `ui-message is-${tone}`;
+}
+
+function actionLabel(action) {
+  switch (action) {
+    case "queue":
+      return "Товар добавлен в очередь.";
+    case "publish":
+      return "Товар опубликован в Telegram.";
+    case "skip":
+      return "Товар пропущен и больше не будет мешать в импорте.";
+    default:
+      return "Действие выполнено.";
   }
 }

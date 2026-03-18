@@ -206,6 +206,42 @@ button.secondary {
   font-size: 13px;
 }
 
+.ui-message,
+.filter-summary {
+  margin-bottom: 14px;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+.ui-message {
+  border: 1px solid var(--line);
+  background: #edf4fb;
+  color: #355066;
+}
+
+.ui-message.is-hidden {
+  display: none;
+}
+
+.ui-message.is-error {
+  background: #fff2f0;
+  border-color: #f2c0b8;
+  color: #a23c2b;
+}
+
+.ui-message.is-info {
+  background: #edf4fb;
+  border-color: var(--line);
+  color: #355066;
+}
+
+.filter-summary {
+  background: #f6f9fc;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+}
+
 .filter-bar {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

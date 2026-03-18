@@ -74,6 +74,8 @@
                 </div>
                 <div class="section-meta">Сначала смотрим выгоду, потом текст поста</div>
               </div>
+              <div id="uiMessage" class="ui-message is-hidden"></div>
+              <div id="filterSummary" class="filter-summary"></div>
               <div class="filter-bar">
                 <label class="filter-field">
                   <span>Магазин</span>
@@ -84,8 +86,8 @@
                 <label class="filter-field">
                   <span>Статус</span>
                   <select id="statusFilter">
-                    <option value="ready">Только ready</option>
                     <option value="all">Любой</option>
+                    <option value="ready">Только ready</option>
                     <option value="review">Только review</option>
                     <option value="queued">Только queued</option>
                     <option value="published">Только published</option>
@@ -93,10 +95,10 @@
                 </label>
                 <label class="filter-field">
                   <span>Скидка от</span>
-                  <input id="minDiscountFilter" type="number" min="0" step="1" value="20" />
+                  <input id="minDiscountFilter" type="number" min="0" step="1" value="0" />
                 </label>
                 <label class="filter-toggle">
-                  <input id="sizesOnlyFilter" type="checkbox" checked />
+                  <input id="sizesOnlyFilter" type="checkbox" />
                   <span>Только с размерами</span>
                 </label>
               </div>
